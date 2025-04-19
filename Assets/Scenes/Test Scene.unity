@@ -1774,7 +1774,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   sampleRate: 16000
   windowSeconds: 1
-  serverUrl: http://localhost:5001
+  serverUrl: http://192.168.35.90:5001
   labelText: {fileID: 1290555430}
   panelTransform: {fileID: 1366412671}
   panelGroup: {fileID: 1366412668}

@@ -20,7 +20,11 @@ public class SocketIOUnityClient : MonoBehaviour
     private bool micInitialized = false;
 
     [Header("Socket.IO")]
-    public string serverUrl = "http://localhost:5001";
+    static public string url ="localhost";
+    static public string port = "5001";
+
+    private string serverUrl = "http://localhost:5001";
+
     private SocketIOUnity socket;
 
     private string currentLabel = "Waiting...";
@@ -57,6 +61,8 @@ public class SocketIOUnityClient : MonoBehaviour
 
     void ConnectSocket()
     {
+        serverUrl = "http://" + url + ":" + port;
+
         socket = new SocketIOUnity(new Uri(serverUrl), new SocketIOOptions
         {
             EIO = 4,
