@@ -4,11 +4,16 @@
           package="com.yourcompany.yourapp">
 
     <!-- 🔐 권한 선언 -->
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />    
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
-
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Android 12 이하: 외부 저장소 접근 -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
+    <!-- Android 13 이상 -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
     <application>
         <activity android:name="com.unity3d.player.UnityPlayerActivity"
