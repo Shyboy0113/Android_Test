@@ -9,6 +9,9 @@ using SocketIOClient;
 using SocketIOClient.Newtonsoft.Json;
 using SocketIOClient.Transport;
 using UnityEngine.UI;
+using System.Text;
+using UnityEngine.Networking;
+using Newtonsoft.Json.Linq;
 
 
 public class SocketIOUnityClient : MonoBehaviour
@@ -184,7 +187,9 @@ public class SocketIOUnityClient : MonoBehaviour
     }
     #endregion
 
-    #region 스크린샷 저장 기능
+    public RawImage targetRawImage;  // Inspector에 RawImage 연결
+
+    #region 안드로이드 스크린샷 저장 기능
     public void OnSaveButtonPressed()
     {
         StartCoroutine(SaveRawImageToGallery());
@@ -263,88 +268,150 @@ public class SocketIOUnityClient : MonoBehaviour
 
     #endregion
 
-    #region 스크린샷 기능 및 GPT로 보내기
+    #region 캡쳐해서 GPT로 보내기(갤러리에 저장 X)
 
     public void OnCaptureButtonPressed()
     {
-        StartCoroutine(CaptureOnlyRawImage());
-    }
-    public RawImage targetRawImage;  // Inspector에 RawImage 연결
+        serverUrl = "http://" + url + ":" + port;
 
-    IEnumerator CaptureOnlyRawImage()
+        StartCoroutine(HTTP_CaptureWebcamImageAndSend());
+    }
+
+    //HTTP로 보내기(코루틴)
+    IEnumerator HTTP_CaptureWebcamImageAndSend()
     {
+        while (FitToScreen.webcamTexture == null || FitToScreen.webcamTexture.width <= 16)
+            yield return null;
+
         yield return new WaitForEndOfFrame();
 
-        // 1. RawImage의 화면상 위치 계산
-        RectTransform rt = targetRawImage.rectTransform;
-        Vector3[] worldCorners = new Vector3[4];
-        rt.GetWorldCorners(worldCorners);
-
-        // 2. UI → 스크린 좌표 변환
-        float minX = worldCorners[0].x;
-        float minY = worldCorners[0].y;
-        float width = worldCorners[2].x - worldCorners[0].x;
-        float height = worldCorners[2].y - worldCorners[0].y;
-
-        // 3. ReadPixels로 해당 영역만 캡처
-        Texture2D tex = new Texture2D((int)width, (int)height, TextureFormat.RGB24, false);
-        tex.ReadPixels(new Rect(minX, minY, width, height), 0, 0);
+        Texture2D tex = new Texture2D(FitToScreen.webcamTexture.width, FitToScreen.webcamTexture.height, TextureFormat.RGB24, false);
+        tex.SetPixels(FitToScreen.webcamTexture.GetPixels());
         tex.Apply();
 
-        // 4. PNG로 인코딩 + 전송 등 처리
+        byte[] imageBytes = tex.EncodeToPNG();
+        string base64Image = Convert.ToBase64String(imageBytes);
+        Destroy(tex);
+
+        // 질문 텍스트
+        string promptText = $"'{currentLabel}'이라는 소리가 감지된 상황에서 찍힌 이미지입니다. 가장 안전한 방향으로 대피하라는 안내 문구를 생성해주세요.";
+
+        // JSON 데이터 구성
+        Dictionary<string, string> jsonData = new Dictionary<string, string>()
+    {
+        { "image_data", base64Image },
+        { "text", promptText }
+    };
+        string jsonString = JsonUtility.ToJson(new JsonWrapper(jsonData));
+
+        // HTTP POST 요청
+        using (UnityWebRequest request = new UnityWebRequest(serverUrl + "/api/openai", "POST"))
+        {
+            byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonString);
+            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+
+            yield return request.SendWebRequest();
+
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                Debug.Log("OpenAI 응답: " + request.downloadHandler.text);
+                // 여기서 응답 내용을 파싱해 화면에 출력하거나 다음 동작으로 넘기기
+
+                //Newton 파싱 이용해서 응답 표현
+                ShowOpenAIResponse(request.downloadHandler.text);
+            }
+            else
+            {
+                Debug.LogWarning("HTTP 전송 실패: " + request.error);
+            }
+        }
+    }
+
+    //HTTP용 JSON Class
+    [System.Serializable]
+    public class JsonWrapper
+    {
+        public string image_data;
+        public string text;
+
+        public JsonWrapper(Dictionary<string, string> dict)
+        {
+            image_data = dict["image_data"];
+            text = dict["text"];
+        }
+    }
+
+//WebSocket으로 보내기(코루틴)
+IEnumerator WS_CaptureWebcamImageAndSend()
+    {
+        // WebCamTexture 준비 상태까지 대기
+        while (FitToScreen.webcamTexture == null || FitToScreen.webcamTexture.width <= 16)
+            yield return null;
+
+        yield return new WaitForEndOfFrame();
+
+        // webcamTexture의 픽셀 데이터를 기반으로 Texture2D 생성
+        Texture2D tex = new Texture2D(FitToScreen.webcamTexture.width, FitToScreen.webcamTexture.height, TextureFormat.RGB24, false);
+        tex.SetPixels(FitToScreen.webcamTexture.GetPixels());
+        tex.Apply();
+
+        // PNG 인코딩
         byte[] imageBytes = tex.EncodeToPNG();
         string base64Image = Convert.ToBase64String(imageBytes);
 
+        // JSON payload 생성
         Dictionary<string, string> payload = new Dictionary<string, string>()
     {
         { "image", base64Image }
     };
 
+        // 서버로 전송
         if (socket != null && socket.Connected)
         {
             socket.Emit("screenshot", payload);
-            Debug.Log("🔍 RawImage 영역만 캡처하여 전송 완료");
+            Debug.Log("webcamTexture 기반 이미지 전송 완료");
+        }
+        else
+        {
+            Debug.LogWarning("소켓 연결이 되어있지 않음");
         }
 
         Destroy(tex);
     }
-
-
-    IEnumerator CaptureScreenshotAndSend()
-    {
-        // 1. 화면 렌더링이 완료될 때까지 대기
-        yield return new WaitForEndOfFrame();
-
-        // 2. 현재 화면의 픽셀을 읽어서 Texture2D에 저장
-        Texture2D screenImage = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
-        screenImage.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
-        screenImage.Apply(); // 실제 이미지 데이터 적용
-
-        // 3. PNG 형식으로 인코딩 (또는 EncodeToJPG()도 가능)
-        byte[] imageBytes = screenImage.EncodeToPNG();
-
-        // 4. base64 문자열로 인코딩
-        string base64Image = Convert.ToBase64String(imageBytes);
-
-        // 5. SocketIO를 통해 JSON 형식으로 이미지 전송
-        Dictionary<string, string> payload = new Dictionary<string, string>()
-    {
-        { "image", base64Image }
-    };
-
-        if (socket != null && socket.Connected)
-        {
-            socket.Emit("screenshot", payload); // 서버에서는 "screenshot" 이벤트로 받음
-            Debug.Log("스크린샷 base64 이미지 전송 완료");
-        }
-        else
-        {
-            Debug.LogWarning("소켓 연결 안 됨. 스크린샷 전송 실패");
-        }
-
-        // 6. 메모리 정리
-        UnityEngine.Object.Destroy(screenImage);
-    }
     #endregion
+
+    #region OpenAI 응답 파싱 및 표시 (Newtonsoft.Json 사용)
+
+    public TMP_Text responseTextUI; // UI 연결 (TextMeshProUGUI)
+
+    void ShowOpenAIResponse(string json)
+    {
+        try
+        {
+            JObject parsed = JObject.Parse(json);
+            string message = parsed["message"]?.ToString();
+
+            if (!string.IsNullOrEmpty(message))
+            {
+                responseTextUI.text = "OpenAI : " + message;
+                Debug.Log("OpenAI 응답: " + message);
+            }
+            else
+            {
+                responseTextUI.text = "응답 메시지가 비어 있음";
+                Debug.LogWarning("응답은 성공했으나 message 필드가 없음");
+            }
+        }
+        catch (System.Exception e)
+        {
+            responseTextUI.text = "OpenAI 응답 파싱 오류";
+            Debug.LogWarning("OpenAI JSON 파싱 실패: " + e.Message);
+        }
+    }
+
+    #endregion
+
 
 }
