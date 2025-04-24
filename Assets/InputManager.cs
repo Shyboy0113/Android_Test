@@ -33,7 +33,7 @@ public class InputManager : MonoBehaviour
 
         currentIP.text = "Current IP = http://" + savedUrl + ":" + savedPort;
 
-        StartCoroutine(RequestAllPermission());
+        RequestAllPermission(1.5f);
 
     }
 
@@ -67,13 +67,22 @@ public class InputManager : MonoBehaviour
         SceneManager.LoadScene(1);
     }
 
-    public IEnumerator RequestAllPermission()
+    public void RequestAllPermission(float time)
+    {
+        StartCoroutine(IE_RequestAllPermission(time));
+    }
+
+    public IEnumerator IE_RequestAllPermission(float time)
     {
         RequestCameraPermission();
 
-        yield return new WaitForSeconds(1.5f);
+        yield return new WaitForSeconds(time);
 
         RequestMicPermission();
+
+        yield return new WaitForSeconds(time);
+
+        RequestStoragePermission();
 
         yield return null;
     }
@@ -111,4 +120,42 @@ public class InputManager : MonoBehaviour
         Debug.Log("Camera permission is only needed on Android.");
 #endif
     }
+
+    public void RequestStoragePermission()
+    {
+#if UNITY_ANDROID
+        int androidVersion = GetAndroidVersion();
+
+        if (androidVersion >= 33)
+        {
+            if (!Permission.HasUserAuthorizedPermission("android.permission.READ_MEDIA_IMAGES"))
+            {
+                Debug.Log("Requesting READ_MEDIA_IMAGES permission...");
+                Permission.RequestUserPermission("android.permission.READ_MEDIA_IMAGES");
+            }
+        }
+        else
+        {
+            if (!Permission.HasUserAuthorizedPermission(Permission.ExternalStorageWrite))
+            {
+                Debug.Log("Requesting WRITE_EXTERNAL_STORAGE permission...");
+                Permission.RequestUserPermission(Permission.ExternalStorageWrite);
+            }
+        }
+#endif
+    }
+
+    private int GetAndroidVersion()
+    {
+#if UNITY_ANDROID
+        using (var versionClass = new AndroidJavaClass("android.os.Build$VERSION"))
+        {
+            return versionClass.GetStatic<int>("SDK_INT");
+        }
+#else
+        return -1;
+#endif
+    }
+
+
 }

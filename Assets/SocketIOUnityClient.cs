@@ -12,6 +12,7 @@ using UnityEngine.UI;
 using System.Text;
 using UnityEngine.Networking;
 using Newtonsoft.Json.Linq;
+using System.Linq;
 
 
 public class SocketIOUnityClient : MonoBehaviour
@@ -26,7 +27,7 @@ public class SocketIOUnityClient : MonoBehaviour
     private bool micInitialized = false;
 
     [Header("Socket.IO")]
-    static public string url ="localhost";
+    static public string url = "localhost";
     static public string port = "5001";
 
     private string serverUrl = "http://localhost:5001";
@@ -44,6 +45,48 @@ public class SocketIOUnityClient : MonoBehaviour
         ConnectSocket();
         StartCoroutine(SendLoop());
     }
+
+    // 조건에 반응할 키워드 목록 (소문자 기준)
+    private readonly List<string> triggerKeywords = new List<string> { "vehicle", "car", "horn", "siren", "truck", "motorcycle" };
+
+    private string lastTriggeredLabel = "";
+
+    void Update()
+    {
+        while (mainThreadActions.Count > 0)
+            mainThreadActions.Dequeue().Invoke();
+
+        if (currentLabel != lastLabel && labelText != null)
+        {
+            labelText.text = $"Label: {currentLabel}";
+            AnimateText(labelText);
+            AnimatePanel();
+            lastLabel = currentLabel;
+        }
+
+        // 조건: 라벨 문자열에 특정 키워드가 포함되어 있고, 중복 전송을 방지
+        if (ShouldTrigger(currentLabel) && currentLabel != lastTriggeredLabel)
+        {
+            StartCoroutine(HTTP_CaptureWebcamImageAndSend());
+            lastTriggeredLabel = currentLabel;
+        }
+
+        // 리셋 조건: currentLabel에 키워드가 없으면 리셋
+        if (!ShouldTrigger(currentLabel))
+        {
+            lastTriggeredLabel = "";
+        }
+    }
+
+    // 키워드 포함 여부 판별 함수
+    bool ShouldTrigger(string label)
+    {
+        if (string.IsNullOrEmpty(label)) return false;
+
+        string lowerLabel = label.ToLower();
+        return triggerKeywords.Any(keyword => lowerLabel.Contains(keyword));
+    }
+
 
     void OnDestroy()
     {
@@ -131,21 +174,6 @@ public class SocketIOUnityClient : MonoBehaviour
         return samples;
     }
 
-    void Update()
-    {
-        while (mainThreadActions.Count > 0)
-        {
-            mainThreadActions.Dequeue().Invoke();
-        }
-
-        if (currentLabel != lastLabel && labelText != null)
-        {
-            labelText.text = $"Label: {currentLabel}";
-            AnimateText(labelText);
-            AnimatePanel();
-            lastLabel = currentLabel;
-        }
-    }
 
     #region UI 애니메이션
     public TextMeshProUGUI labelText;
@@ -294,7 +322,7 @@ public class SocketIOUnityClient : MonoBehaviour
         Destroy(tex);
 
         // 질문 텍스트
-        string promptText = $"'{currentLabel}'이라는 소리가 감지된 상황에서 찍힌 이미지입니다. 가장 안전한 방향으로 대피하라는 안내 문구를 생성해주세요.";
+        string promptText = GetPromptFromLabel(currentLabel);
 
         // JSON 데이터 구성
         Dictionary<string, string> jsonData = new Dictionary<string, string>()
@@ -329,6 +357,38 @@ public class SocketIOUnityClient : MonoBehaviour
         }
     }
 
+    // 라벨 키워드와 해당 상황에 대한 프롬프트 매핑
+    private readonly Dictionary<string, string> labelPrompts = new Dictionary<string, string>()
+{
+    { "vehicle", "차량이 감지된 상황에서, 안전하게 대피할 수 있는 방향을 안내해줘." },
+    { "car", "자동차가 감지된 장소에서, 사용자가 안전하게 이동할 수 있는 경로를 제시해줘." },
+    { "horn", "경적이 들린 상황이야. 도로 위라면 안전한 쪽으로 이동할 수 있도록 안내해줘." },
+    { "siren", "사이렌이 울리고 있어. 구조차량이 접근 중이라면 어떻게 대처해야 할까?" },
+    { "gunshot", "총성이 감지된 위험한 상황이야. 어디로 피신하는 게 안전할까?" },
+    { "dog", "개 짖는 소리가 들려. 위협적인 상황일 수도 있으니 주변 분석을 해줘." }
+};
+
+    string GetPromptFromLabel(string label)
+    {
+        if (string.IsNullOrEmpty(label)) return null;
+
+        string lowerLabel = label.ToLower();
+
+        // 여러 키워드를 포함하고 있을 경우, 가장 먼저 일치하는 키워드 기준
+        foreach (var kv in labelPrompts)
+        {
+            if (lowerLabel.Contains(kv.Key.ToLower()))
+            {
+                return kv.Value;
+            }
+        }
+
+        // 매칭되는 키워드가 없을 경우 기본 프롬프트 반환
+        return $"'{label}'이라는 소리가 감지된 상황에서 찍힌 이미지입니다. 가장 안전한 방향으로 대피하라는 안내 문구를 생성해주세요.";
+    }
+
+
+
     //HTTP용 JSON Class
     [System.Serializable]
     public class JsonWrapper
@@ -341,44 +401,6 @@ public class SocketIOUnityClient : MonoBehaviour
             image_data = dict["image_data"];
             text = dict["text"];
         }
-    }
-
-//WebSocket으로 보내기(코루틴)
-IEnumerator WS_CaptureWebcamImageAndSend()
-    {
-        // WebCamTexture 준비 상태까지 대기
-        while (FitToScreen.webcamTexture == null || FitToScreen.webcamTexture.width <= 16)
-            yield return null;
-
-        yield return new WaitForEndOfFrame();
-
-        // webcamTexture의 픽셀 데이터를 기반으로 Texture2D 생성
-        Texture2D tex = new Texture2D(FitToScreen.webcamTexture.width, FitToScreen.webcamTexture.height, TextureFormat.RGB24, false);
-        tex.SetPixels(FitToScreen.webcamTexture.GetPixels());
-        tex.Apply();
-
-        // PNG 인코딩
-        byte[] imageBytes = tex.EncodeToPNG();
-        string base64Image = Convert.ToBase64String(imageBytes);
-
-        // JSON payload 생성
-        Dictionary<string, string> payload = new Dictionary<string, string>()
-    {
-        { "image", base64Image }
-    };
-
-        // 서버로 전송
-        if (socket != null && socket.Connected)
-        {
-            socket.Emit("screenshot", payload);
-            Debug.Log("webcamTexture 기반 이미지 전송 완료");
-        }
-        else
-        {
-            Debug.LogWarning("소켓 연결이 되어있지 않음");
-        }
-
-        Destroy(tex);
     }
     #endregion
 
