@@ -88,13 +88,21 @@ public class SocketIOUnityClient : MonoBehaviour
 
         socket.OnConnected += (sender, e) => Debug.Log("Socket.IO 연결됨");
 
+
         socket.OnUnityThread("data_response", response =>
         {
             var data = response.GetValue<Dictionary<string, string>>();
-            if (data.TryGetValue("label", out string label))
+
+            if (data.TryGetValue("label", out string label) && data.TryGetValue("category", out string category))
             {
-                Debug.Log("서버에서 받은 라벨: " + label);
+                Debug.Log("서버에서 받은 라벨: " + label + ", 분류 번호 : " + category);
+
                 mainThreadActions.Enqueue(() => currentLabel = label);
+
+                if (category == "1")
+                {
+                    mainThreadActions.Enqueue(() => StartCoroutine(WS_CaptureWebcamImageAndSend()));
+                }
             }
         });
 
