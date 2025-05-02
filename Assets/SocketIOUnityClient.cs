@@ -11,6 +11,7 @@ using SocketIOClient.Transport;
 using UnityEngine.UI;
 using System.Text;
 using Newtonsoft.Json.Linq;
+using static System.Net.WebRequestMethods;
 
 public class SocketIOUnityClient : MonoBehaviour
 {
@@ -24,9 +25,9 @@ public class SocketIOUnityClient : MonoBehaviour
     private bool micInitialized = false;
 
     [Header("Socket.IO")]
-    static public string url = "localhost";
-    static public string port = "5001";
-    private string serverUrl = "http://localhost:5001";
+    static public string url;
+    static public string port;
+    private string serverUrl = "http://cssv00.iptime.org:5001/";
     private SocketIOUnity socket;
 
     private string currentLabel = "Waiting...";
@@ -35,6 +36,13 @@ public class SocketIOUnityClient : MonoBehaviour
 
     void Start()
     {
+        // 여기에 PlayerPrefs 값을 다시 로드해서 static 변수에 반영
+        url = PlayerPrefs.GetString("ServerURL", "cssv00.iptime.org");
+        port = PlayerPrefs.GetString("ServerPort", "5001");
+
+        serverUrl = "http://" + url + ":" + port;
+        Debug.Log(" 최종 서버 주소: " + serverUrl);
+
         StartMicrophone();
         ConnectSocket();
         StartCoroutine(SendLoop());

@@ -20,7 +20,8 @@ public class FitToScreen : MonoBehaviour
             Permission.RequestUserPermission(Permission.Camera);
         }
 
-        webcamTexture = new WebCamTexture();
+        webcamTexture = new WebCamTexture(requestedWidth: 4000, requestedHeight: 2252);
+
         rawImage.texture = webcamTexture;
         rawImage.material.mainTexture = webcamTexture;
         webcamTexture.Play();
