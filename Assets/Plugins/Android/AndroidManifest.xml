@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          xmlns:tools="http://schemas.android.com/tools"
-          package="com.yourcompany.yourapp">
+    package="com.yourcompany.yourapp">
 
-    <!-- 🔐 권한 -->
+    <!-- 권한 설정 (모두 유지) -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAMERA" />
@@ -11,20 +10,22 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" /> -->
+    <!-- Galaxy S24+에서는 MANAGE_EXTERNAL_STORAGE는 권장되지 않으며, 일반 앱은 사용 불가 -->
 
     <application
-        android:usesCleartextTraffic="true"
-        android:networkSecurityConfig="@xml/network_security_config"
-        tools:targetApi="31">
+        android:usesCleartextTraffic="true">
 
         <activity android:name="com.unity3d.player.UnityPlayerActivity"
                   android:theme="@style/UnityThemeSelector"
-                  android:exported="true"> <!-- ✅ 이 줄 추가 -->
+                  android:exported="true"
+                  android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             <meta-data android:name="unityplayer.UnityActivity" android:value="true" />
         </activity>
+
     </application>
 </manifest>
