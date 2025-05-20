@@ -34,6 +34,7 @@ public class SocketIOUnityClient : MonoBehaviour
     private string lastLabel = "";
     private Queue<Action> mainThreadActions = new Queue<Action>();
 
+    [SerializeField] private UIManager uiManager;
     void Start()
     {
         // 여기에 PlayerPrefs 값을 다시 로드해서 static 변수에 반영
@@ -53,13 +54,13 @@ public class SocketIOUnityClient : MonoBehaviour
         while (mainThreadActions.Count > 0)
             mainThreadActions.Dequeue().Invoke();
 
-        if (currentLabel != lastLabel && labelText != null)
-        {
-            labelText.text = $"Label: {currentLabel}";
-            AnimateText(labelText);
-            AnimatePanel();
-            lastLabel = currentLabel;
-        }
+        //if (currentLabel != lastLabel && labelText != null)
+        //{
+        //    labelText.text = $"Label: {currentLabel}";
+        //    AnimateText(labelText);
+        //    AnimatePanel();
+        //    lastLabel = currentLabel;
+        //}
     }
 
     void OnDestroy()
@@ -105,9 +106,14 @@ public class SocketIOUnityClient : MonoBehaviour
             {
                 Debug.Log("서버에서 받은 라벨: " + label + ", 분류 번호 : " + category);
 
-                mainThreadActions.Enqueue(() => currentLabel = label);
+                //mainThreadActions.Enqueue(() => currentLabel = label);
+                mainThreadActions.Enqueue(() => uiManager.RequestLabel(label, (LabelType)(category[0] - '0')));
 
-                if (category == "1")
+                if (category == "1") 
+                {
+                    mainThreadActions.Enqueue(() => uiManager.RequestWarning(label));
+                }
+                else if (category == "2")
                 {
                     mainThreadActions.Enqueue(() => StartCoroutine(WS_CaptureWebcamImageAndSend()));
                 }
@@ -165,27 +171,27 @@ public class SocketIOUnityClient : MonoBehaviour
     }
 
 
-    public TextMeshProUGUI labelText;
-    public RectTransform panelTransform;
-    public CanvasGroup panelGroup;
+    //public TextMeshProUGUI labelText;
+    //public RectTransform panelTransform;
+    //public CanvasGroup panelGroup;
 
-    void AnimateText(TextMeshProUGUI text)
-    {
-        if (text == null) return;
-        text.transform.DOKill();
-        text.transform.localScale = Vector3.one;
-        text.transform.DOScale(1.2f, 0.15f).SetEase(Ease.OutBack).SetLoops(2, LoopType.Yoyo);
-        Color originalColor = text.color;
-        text.DOColor(Color.yellow, 0.1f).OnComplete(() => text.DOColor(originalColor, 0.2f));
-    }
+    //void AnimateText(TextMeshProUGUI text)
+    //{
+    //    if (text == null) return;
+    //    text.transform.DOKill();
+    //    text.transform.localScale = Vector3.one;
+    //    text.transform.DOScale(1.2f, 0.15f).SetEase(Ease.OutBack).SetLoops(2, LoopType.Yoyo);
+    //    Color originalColor = text.color;
+    //    text.DOColor(Color.yellow, 0.1f).OnComplete(() => text.DOColor(originalColor, 0.2f));
+    //}
 
-    void AnimatePanel()
-    {
-        if (panelTransform == null) return;
-        panelTransform.DOKill();
-        panelTransform.localScale = Vector3.one;
-        panelTransform.DOScale(1.05f, 0.15f).SetEase(Ease.OutBack).SetLoops(2, LoopType.Yoyo);
-    }
+    //void AnimatePanel()
+    //{
+    //    if (panelTransform == null) return;
+    //    panelTransform.DOKill();
+    //    panelTransform.localScale = Vector3.one;
+    //    panelTransform.DOScale(1.05f, 0.15f).SetEase(Ease.OutBack).SetLoops(2, LoopType.Yoyo);
+    //}
 
     public RawImage targetRawImage;
 
@@ -227,7 +233,7 @@ public class SocketIOUnityClient : MonoBehaviour
         Destroy(tex);
     }
 
-    public TMP_Text responseTextUI;
+    //public TMP_Text responseTextUI;
 
     void ShowOpenAIResponse(string json)
     {
@@ -238,18 +244,21 @@ public class SocketIOUnityClient : MonoBehaviour
 
             if (!string.IsNullOrEmpty(message))
             {
-                responseTextUI.text = "OpenAI : " + message;
+                //responseTextUI.text = "OpenAI : " + message;
+                uiManager.RequestDanger("", message);
                 Debug.Log("OpenAI 응답: " + message);
             }
             else
             {
-                responseTextUI.text = "응답 메시지가 비어 있음";
+                //responseTextUI.text = "응답 메시지가 비어 있음";
+                uiManager.RequestDanger("", "응답 메시지가 비어 있음");
                 Debug.LogWarning("응답은 성공했으나 message 필드가 없음");
             }
         }
         catch (System.Exception e)
         {
-            responseTextUI.text = "OpenAI 응답 파싱 오류";
+            //responseTextUI.text = "OpenAI 응답 파싱 오류";
+            uiManager.RequestDanger("", "OpenAI 응답 파싱 오류");
             Debug.LogWarning("OpenAI JSON 파싱 실패: " + e.Message);
         }
     }
