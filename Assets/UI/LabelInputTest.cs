@@ -11,7 +11,7 @@ public class LabelInputTest : MonoBehaviour
     string testString = "012";
     void Start()
     {
-        StartCoroutine(TestLabelInput());
+        //StartCoroutine(TestLabelInput());
     }
     private void Update()
     {
@@ -26,8 +26,8 @@ public class LabelInputTest : MonoBehaviour
     {
         while (true)
         {
-            yield return new WaitForSeconds(1.0f);
-            GetComponent<UIManager>().RequestLabel("label test", 0);
+            yield return new WaitForSeconds(Random.Range(0.5f, 1.5f));
+            GetComponent<UIManager>().RequestLabel("label test" + Random.Range(0, 20), LabelType.Warning);
             Debug.Log("label testing...");
         }
     }

@@ -19,10 +19,12 @@ public class UIManager : MonoBehaviour
 
     [SerializeField] private GameObject warningLabelText;
     [SerializeField] private GameObject warningDescText;
+    [SerializeField] private GameObject thumb;
     private void Awake()
     {
         warningLabelText.SetActive(false);
         warningDescText.SetActive(false);
+        thumb.SetActive(false);
     }
     public void RequestLabel(string label, LabelType type) 
     {
@@ -48,25 +50,43 @@ public class UIManager : MonoBehaviour
     {
         if (isDanger) return;
         warningLabelText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().color = warningColor;
-        warningLabelText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = label;
-        warningDescText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "";
+        warningLabelText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "주의: " + label;
+        warningDescText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = GetWarningText(label);
 
         warningLabelText.SetActive(true);
         warningDescText.SetActive(true);
+        thumb.SetActive(true);
 
         StopAllCoroutines();
         StartCoroutine(WarningTextCooltime(5.0f));
     }
+    private string GetWarningText(string label) 
+    {
+        return "";
+    }
     private bool isDanger = false;
     public void RequestDanger(string label, string suggestion)
     {
+        LabelUIElement dangerLabel = null;
+        for (int i = 0; i < labelUI.transform.childCount; i++)
+        {
+            if (labelUI.transform.GetChild(i).GetComponent<LabelUIElement>().label == label)
+            {
+                dangerLabel = labelUI.transform.GetChild(i).GetComponent<LabelUIElement>();
+                if(dangerLabel.isCallAI) return;
+                break;
+            }
+        }
+        dangerLabel.GetComponent<LabelUIElement>().CallAI();
+
         isDanger = true;
         warningLabelText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().color = dangerColor;
-        warningLabelText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = label;
+        warningLabelText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "경고: " + label;
         warningDescText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = suggestion;
 
         warningLabelText.SetActive(true);
         warningDescText.SetActive(true);
+        thumb.SetActive(true);
 
         StopAllCoroutines();
         StartCoroutine(WarningTextCooltime(10.0f));
@@ -80,6 +100,12 @@ public class UIManager : MonoBehaviour
         warningDescText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "";
         warningLabelText.SetActive(false);
         warningDescText.SetActive(false);
+        thumb.SetActive(false);
         isDanger = false;
+    }
+
+    public void OnClickThumb()
+    {
+        thumb.SetActive(false);
     }
 }

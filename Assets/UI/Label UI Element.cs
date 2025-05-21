@@ -14,6 +14,7 @@ public class LabelUIElement : MonoBehaviour
     public string label { get; private set; }
     private float lifeTime;
     private UIManager uiManager;
+    public bool isCallAI { get; private set; }
 
     private List<Color> colors = new List<Color>
     {
@@ -30,6 +31,8 @@ public class LabelUIElement : MonoBehaviour
         label = text;
         lifeTime = 5.0f;
         uiManager = uim;
+
+        isCallAI = false;
     }
     private void Update()
     {
@@ -48,5 +51,10 @@ public class LabelUIElement : MonoBehaviour
         {
             lifeTime += 5.0f;
         }
+    }
+
+    public void CallAI() 
+    {
+        isCallAI = true;
     }
 }

@@ -12,6 +12,7 @@ using UnityEngine.UI;
 using System.Text;
 using Newtonsoft.Json.Linq;
 using static System.Net.WebRequestMethods;
+using Newtonsoft.Json;
 
 public class SocketIOUnityClient : MonoBehaviour
 {
@@ -98,7 +99,7 @@ public class SocketIOUnityClient : MonoBehaviour
         socket.OnConnected += (sender, e) => Debug.Log("Socket.IO 연결됨");
 
 
-        socket.OnUnityThread("data_response", response =>
+        socket.OnUnityThread("audio_response", response =>
         {
             var data = response.GetValue<Dictionary<string, string>>();
 
@@ -109,21 +110,30 @@ public class SocketIOUnityClient : MonoBehaviour
                 //mainThreadActions.Enqueue(() => currentLabel = label);
                 mainThreadActions.Enqueue(() => uiManager.RequestLabel(label, (LabelType)(category[0] - '0')));
 
-                if (category == "1") 
+                if (category == "1")
                 {
                     mainThreadActions.Enqueue(() => uiManager.RequestWarning(label));
                 }
                 else if (category == "2")
                 {
-                    mainThreadActions.Enqueue(() => StartCoroutine(WS_CaptureWebcamImageAndSend()));
+                    mainThreadActions.Enqueue(() => StartCoroutine(WS_CaptureWebcamImageAndSend(label)));
                 }
+                //if (category == "1" || category == "2")
+                //{
+                //    mainThreadActions.Enqueue(() => StartCoroutine(WS_CaptureWebcamImageAndSend(label)));
+                //}
             }
         });
 
         socket.OnUnityThread("gpt_response", response =>
         {
-            var json = response.GetValue<string>();
-            mainThreadActions.Enqueue(() => ShowOpenAIResponse(json));
+            Debug.LogError("gpt response");
+            var data = response.GetValue<Dictionary<string, string>>();
+
+            if (data.TryGetValue("label", out string label) && data.TryGetValue("suggestion", out string suggestion))
+            {
+                mainThreadActions.Enqueue(() => uiManager.RequestDanger(label, suggestion));
+            }
         });
 
         socket.Connect();
@@ -198,68 +208,75 @@ public class SocketIOUnityClient : MonoBehaviour
     public void OnCaptureButtonPressed()
     {
         serverUrl = "http://" + url + ":" + port;
-        StartCoroutine(WS_CaptureWebcamImageAndSend());
+        StartCoroutine(WS_CaptureWebcamImageAndSend(""));
     }
 
-    IEnumerator WS_CaptureWebcamImageAndSend()
+    bool isCreate = false;
+    IEnumerator WS_CaptureWebcamImageAndSend(string curLabel)
     {
+        if (isCreate) yield break;
         while (FitToScreen.webcamTexture == null || FitToScreen.webcamTexture.width <= 16)
             yield return null;
 
+        isCreate = true;
         yield return new WaitForEndOfFrame();
 
         Texture2D tex = new Texture2D(FitToScreen.webcamTexture.width, FitToScreen.webcamTexture.height, TextureFormat.RGB24, false);
         tex.SetPixels(FitToScreen.webcamTexture.GetPixels());
         tex.Apply();
 
-        string base64Image = Convert.ToBase64String(tex.EncodeToPNG());
+        byte[] jpg = tex.EncodeToJPG(60);
+        //System.IO.File.WriteAllBytes(Path.Combine(Application.persistentDataPath, DateTime.Now.ToString("yyyyMMdd_HHmmss") + "_60.jpg"), jpg);
+        string base64Image = Convert.ToBase64String(jpg);
 
         Dictionary<string, string> payload = new Dictionary<string, string>()
         {
             { "image", base64Image },
-            { "label", currentLabel }
+            { "label", curLabel }
         };
 
         if (socket != null && socket.Connected)
         {
             socket.Emit("screenshot", payload);
-            Debug.Log("이미지 + 라벨 전송 완료");
+            Debug.LogError("이미지 + 라벨 전송 완료");
         }
         else
         {
             Debug.LogWarning("소켓 연결 안 됨");
         }
 
+        yield return new WaitForSeconds(10.0f);
+        isCreate = false;
         Destroy(tex);
     }
 
     //public TMP_Text responseTextUI;
 
-    void ShowOpenAIResponse(string json)
-    {
-        try
-        {
-            JObject parsed = JObject.Parse(json);
-            string message = parsed["message"]?.ToString();
+    //void ShowOpenAIResponse(string label, string suggestion)
+    //{
+    //    try
+    //    {
+    //        JObject parsed = JObject.Parse(suggestion);
+    //        string message = parsed["message"]?.ToString();
 
-            if (!string.IsNullOrEmpty(message))
-            {
-                //responseTextUI.text = "OpenAI : " + message;
-                uiManager.RequestDanger("", message);
-                Debug.Log("OpenAI 응답: " + message);
-            }
-            else
-            {
-                //responseTextUI.text = "응답 메시지가 비어 있음";
-                uiManager.RequestDanger("", "응답 메시지가 비어 있음");
-                Debug.LogWarning("응답은 성공했으나 message 필드가 없음");
-            }
-        }
-        catch (System.Exception e)
-        {
-            //responseTextUI.text = "OpenAI 응답 파싱 오류";
-            uiManager.RequestDanger("", "OpenAI 응답 파싱 오류");
-            Debug.LogWarning("OpenAI JSON 파싱 실패: " + e.Message);
-        }
-    }
+    //        if (!string.IsNullOrEmpty(message))
+    //        {
+    //            //responseTextUI.text = "OpenAI : " + message;
+    //            uiManager.RequestDanger(label, message);
+    //            Debug.Log("OpenAI 응답: " + message);
+    //        }
+    //        else
+    //        {
+    //            //responseTextUI.text = "응답 메시지가 비어 있음";
+    //            uiManager.RequestDanger(label, "응답 메시지가 비어 있음");
+    //            Debug.LogWarning("응답은 성공했으나 message 필드가 없음");
+    //        }
+    //    }
+    //    catch (System.Exception e)
+    //    {
+    //        //responseTextUI.text = "OpenAI 응답 파싱 오류";
+    //        uiManager.RequestDanger(label, "OpenAI 응답 파싱 오류 " + e.Message);
+    //        Debug.LogWarning("OpenAI JSON 파싱 실패: " + e.Message);
+    //    }
+    //}
 }
