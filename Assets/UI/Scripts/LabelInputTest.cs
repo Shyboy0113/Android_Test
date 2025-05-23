@@ -11,7 +11,9 @@ public class LabelInputTest : MonoBehaviour
     string testString = "012";
     void Start()
     {
-        //StartCoroutine(TestLabelInput());
+#if UNITY_EDITOR
+        StartCoroutine(TestLabelInput());
+#endif
     }
     private void Update()
     {

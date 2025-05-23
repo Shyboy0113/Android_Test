@@ -10,8 +10,6 @@ public class FitToScreen : MonoBehaviour
     public RawImage rawImage;     // 화면에 보여줄 UI
     public static WebCamTexture webcamTexture;
 
-    public TMP_Text text;
-
     void Start()
     {
 
@@ -27,11 +25,6 @@ public class FitToScreen : MonoBehaviour
         webcamTexture.Play();
 
         StartCoroutine(AdjustAspectWhenReady());
-    }
-
-    private void Update()
-    {
-        text.text = "Current Resolution = " + Screen.width.ToString() + "x" + Screen.height.ToString();
     }
 
     private IEnumerator AdjustAspectWhenReady()

@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -19,12 +20,46 @@ public class UIManager : MonoBehaviour
 
     [SerializeField] private GameObject warningLabelText;
     [SerializeField] private GameObject warningDescText;
-    [SerializeField] private GameObject thumb;
+    private bool isFadeOut = false;
+
+    [SerializeField] private GameObject feedbackUI;
+ 
+    private List<Tuple<string, string>> suggestionMessages;
     private void Awake()
     {
-        warningLabelText.SetActive(false);
-        warningDescText.SetActive(false);
-        thumb.SetActive(false);
+        warningLabelText.GetComponent<CanvasGroup>().alpha = 0;
+        warningDescText.GetComponent<CanvasGroup>().alpha = 0;
+
+        feedbackUI.SetActive(false);
+
+        SetSuggestionMessage();
+    }
+    private void Update()
+    {
+        if (isFadeOut)
+        {
+            warningLabelText.GetComponent<CanvasGroup>().alpha -= Time.deltaTime * 2;
+            warningDescText.GetComponent<CanvasGroup>().alpha -= Time.deltaTime * 2;
+            if (warningLabelText.GetComponent<CanvasGroup>().alpha <= 0) isFadeOut = false;
+        }
+
+        if (Input.GetKeyDown(KeyCode.W))
+        {
+            feedbackUI.SetActive(true);
+            feedbackUI.GetComponent<FeedbackUI>().SetFeedbackUI("test", "test");
+        }
+    }
+    private void SetSuggestionMessage()
+    {
+        var file = FileRead.Read("suggestion_message", out Dictionary<string, int> colInfo);
+        if (file == null) return;
+
+        suggestionMessages = new();
+        for (int i = 0; i < file.Count; i++) 
+        {
+            Tuple<string, string> tuple = new(file[i][0], file[i][1]);
+            suggestionMessages.Add(tuple);
+        }
     }
     public void RequestLabel(string label, LabelType type) 
     {
@@ -43,7 +78,9 @@ public class UIManager : MonoBehaviour
 
     public void DestroyLabel(GameObject element) 
     {
-        Destroy(element);
+        //element.transform.SetParent(this.transform);
+        //element.transform.SetAsFirstSibling();
+        element.GetComponent<LabelUIElement>().DestroyLabelUI();
     }
 
     public void RequestWarning(string label)
@@ -53,16 +90,20 @@ public class UIManager : MonoBehaviour
         warningLabelText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "주의: " + label;
         warningDescText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = GetWarningText(label);
 
-        warningLabelText.SetActive(true);
-        warningDescText.SetActive(true);
-        thumb.SetActive(true);
+        isFadeOut = false;
+        warningLabelText.GetComponent<CanvasGroup>().alpha = 1;
+        warningDescText.GetComponent<CanvasGroup>().alpha = 1;
 
         StopAllCoroutines();
-        StartCoroutine(WarningTextCooltime(5.0f));
+        StartCoroutine(WarningTextCooltime(5.0f, false));
     }
     private string GetWarningText(string label) 
     {
-        return "";
+        foreach (var m in suggestionMessages) 
+        {
+            if (m.Item1 == label) return m.Item2;
+        }
+        return "등록되지 않은 라벨 정보입니다.";
     }
     private bool isDanger = false;
     public void RequestDanger(string label, string suggestion)
@@ -84,28 +125,33 @@ public class UIManager : MonoBehaviour
         warningLabelText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "경고: " + label;
         warningDescText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = suggestion;
 
-        warningLabelText.SetActive(true);
-        warningDescText.SetActive(true);
-        thumb.SetActive(true);
+        isFadeOut = false;
+        warningLabelText.GetComponent<CanvasGroup>().alpha = 1;
+        warningDescText.GetComponent<CanvasGroup>().alpha = 1;
 
         StopAllCoroutines();
-        StartCoroutine(WarningTextCooltime(10.0f));
+        StartCoroutine(WarningTextCooltime(10.0f, true));
     }
-    IEnumerator WarningTextCooltime(float cooltime) 
+    IEnumerator WarningTextCooltime(float cooltime, bool wasDanger) 
     {
         yield return new WaitForSeconds(cooltime);
+
+        if (wasDanger)
+        {
+            feedbackUI.SetActive(true);
+            feedbackUI.GetComponent<FeedbackUI>().SetFeedbackUI
+                (
+                warningLabelText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text,
+                warningDescText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text
+                );
+        }
+
         warningLabelText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().color = Color.white;
         warningDescText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().color = Color.white;
         warningLabelText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "";
         warningDescText.transform.GetChild(0).GetComponent<TextMeshProUGUI>().text = "";
-        warningLabelText.SetActive(false);
-        warningDescText.SetActive(false);
-        thumb.SetActive(false);
-        isDanger = false;
-    }
 
-    public void OnClickThumb()
-    {
-        thumb.SetActive(false);
+        isFadeOut = true;
+        isDanger = false;
     }
 }

@@ -16,6 +16,8 @@ public class LabelUIElement : MonoBehaviour
     private UIManager uiManager;
     public bool isCallAI { get; private set; }
 
+    private bool isDestroyed = false;
+
     private List<Color> colors = new List<Color>
     {
         Color.white,
@@ -36,12 +38,22 @@ public class LabelUIElement : MonoBehaviour
     }
     private void Update()
     {
-        if (lifeTime > 0) 
+        if (lifeTime > 0)
         {
             lifeTime -= Time.deltaTime;
-            if (lifeTime <= 0) 
+            if (lifeTime <= 0)
             {
                 uiManager.DestroyLabel(this.gameObject);
+            }
+        }
+
+        if (isDestroyed) 
+        {
+            //GetComponent<RectTransform>().position += Vector3.right * Time.deltaTime * 3.0f;
+            GetComponent<CanvasGroup>().alpha -= Time.deltaTime * 2;
+            if (GetComponent<CanvasGroup>().alpha <= 0) 
+            {
+                Destroy(this.gameObject);
             }
         }
     }
@@ -56,5 +68,10 @@ public class LabelUIElement : MonoBehaviour
     public void CallAI() 
     {
         isCallAI = true;
+    }
+
+    public void DestroyLabelUI()
+    {
+        isDestroyed = true;
     }
 }
